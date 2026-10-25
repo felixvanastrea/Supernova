@@ -454,9 +454,9 @@ function ringPts(R){
 
 function resize(){
   W=window.innerWidth; H=window.innerHeight;
-  // zoom: about 2.5 screen px per game pixel, rounded to whole device pixels so the pixel art stays sharp
+  // zoom: the original setting (about 3 screen px per game pixel on phones), rounded to whole device pixels so the pixel art stays sharp
   const DPR=Math.min(3,window.devicePixelRatio||1);
-  const want=Math.max(2,Math.min(W/158,H/300));
+  const want=Math.max(2,Math.round(Math.min(W/140,H/250)));
   DS=Math.max(Math.round(2*DPR),Math.round(want*DPR)); PX=DS/DPR;
   TS=Math.max(1,2.6/PX);
   LW=Math.ceil(W/PX); LH=Math.ceil(H/PX);
