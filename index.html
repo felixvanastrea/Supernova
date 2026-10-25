@@ -325,7 +325,7 @@ const MAXT=TIERS.length-1, OUTLINE=[11,10,30], FR=16, SCORE_RATE=.1;
 const BAYER=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]].map(r=>r.map(v=>(v+.5)/16));
 const cv=document.getElementById('c'), ctx=cv.getContext('2d');
 const $=id=>document.getElementById(id);
-let W=0,H=0,PX=3,LW=0,LH=0,frames=[],stars=[],sparkles=[],ringCache={};
+let W=0,H=0,PX=3,DS=3,LW=0,LH=0,frames=[],stars=[],sparkles=[],ringCache={};
 const rgb=h=>{const n=parseInt(h.slice(1),16);return [n>>16,(n>>8)&255,n&255]};
 const rad=t=>TIERS[t].r;
 const lerp=(a,b,k)=>a+(b-a)*k;
@@ -454,11 +454,14 @@ function ringPts(R){
 
 function resize(){
   W=window.innerWidth; H=window.innerHeight;
-  PX=Math.max(2,Math.round(Math.min(W/200,H/360)));
+  // zoom: about 2.5 screen px per game pixel, rounded to whole device pixels so the pixel art stays sharp
+  const DPR=Math.min(3,window.devicePixelRatio||1);
+  const want=Math.max(2,Math.min(W/158,H/300));
+  DS=Math.max(Math.round(2*DPR),Math.round(want*DPR)); PX=DS/DPR;
   TS=Math.max(1,2.6/PX);
   LW=Math.ceil(W/PX); LH=Math.ceil(H/PX);
-  cv.width=LW*PX; cv.height=LH*PX; cv.style.width=cv.width+'px'; cv.style.height=cv.height+'px';
-  sn=v=>Math.round(v*PX)/PX;
+  cv.width=LW*DS; cv.height=LH*DS; cv.style.width=(LW*PX)+'px'; cv.style.height=(LH*PX)+'px';
+  sn=v=>Math.round(v*DS)/DS;
   if(!frames.length) frames=TIERS.map((_,i)=>makeFrames(i));
   skyCache={}; skyFrom=null; skyMix=1; getSky(themeIdx);
   stars=[]; const n=Math.round(LW*LH/130);
@@ -1129,8 +1132,8 @@ function drawMeteor(m){
 function draw(now){
   ctx.imageSmoothingEnabled=false;
   const sk=save.settings.shake&&shake>.3?shake:0;
-  const shx=sk?Math.round((Math.random()-.5)*sk*PX):0, shy=sk?Math.round((Math.random()-.5)*sk*PX):0;
-  ctx.setTransform(PX,0,0,PX,shx,shy);
+  const shx=sk?Math.round((Math.random()-.5)*sk*DS):0, shy=sk?Math.round((Math.random()-.5)*sk*DS):0;
+  ctx.setTransform(DS,0,0,DS,shx,shy);
   const th=THEMES[themeIdx];
 
   const sky=getSky(themeIdx), SH=sky.height, sy=(scrollY*.05)%SH;
@@ -1225,7 +1228,7 @@ function draw(now){
   }
   ctx.globalAlpha=1;
 
-  ctx.setTransform(PX,0,0,PX,0,0);
+  ctx.setTransform(DS,0,0,DS,0,0);
   if(edgeGlow>0){
     const g=ctx.createRadialGradient(LW/2,LH/2,Math.min(LW,LH)*.38,LW/2,LH/2,Math.max(LW,LH)*.72);
     g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,edgeCol);
