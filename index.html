@@ -554,19 +554,21 @@ function phase(){
   if(state!=='play') return EASY;
   if(novas<HARD_AT){ const k=novas/HARD_AT, o={}; for(const key in EASY) o[key]=EASY[key]+(HARD[key]-EASY[key])*k; return o }
   const h=novas-HARD_AT;
-  return {spd:HARD.spd+h*.15, threat:Math.min(.52,HARD.threat+h*.02), same:.3, gap:Math.max(.22,HARD.gap-h*.03), drift:1.6, jump:.35};
+  return {spd:HARD.spd+h*.15, threat:Math.min(.58,HARD.threat+h*.015), same:.3, gap:Math.max(.22,HARD.gap-h*.03), drift:1.6, jump:Math.min(.55,.35+h*.02)};
 }
 function meteorGap(){
   if(novas<HARD_AT){ const k=novas/HARD_AT; return 9-6*k+Math.random()*(6-3.5*k) }
   return Math.max(1.6,3-(novas-HARD_AT)*.3)+Math.random()*2.5;
 }
-const holeGap=()=>28+Math.random()*22;
+const SPEED_CAP=.6; // top scroll speed, in screen heights per second
+const holeGap=()=>{ const h=Math.max(0,novas-HARD_AT); return Math.max(12,28-h*1.6)+Math.random()*Math.max(8,22-h) };
 const scoreMult=()=>1+novas*.5;
 const shieldMax=()=>1+(pw.shield?1:0);
 function addScore(n){const m=SCORE_RATE*(pw.boost?1.5:1); score+=n*m; return Math.max(1,Math.round(n*m))}
 function scrollSpeed(){
   if(state!=='play') return LH*.06;
-  return (LH*.16 + Math.min(elapsed,200)*LH*.0016) * phase().spd * (pw.slow?.88:1);
+  // capped so it never becomes unplayable; hard mode gets harder through dangers instead
+  return Math.min(LH*SPEED_CAP, (LH*.16 + Math.min(elapsed,200)*LH*.0016) * phase().spd) * (pw.slow?.88:1);
 }
 function slowmo(hold,amt=.7){slowAmt=Math.max(slowAmt,amt); slowHold=Math.max(slowHold,hold)}
 
@@ -834,8 +836,8 @@ function queueMeteor(o={}){
   const x0=o.x0??LW*(.1+Math.random()*.8), y0=-6;
   const aim=o.aim??(player&&Math.random()<.55 ? player.x+(Math.random()-.5)*LW*.3 : LW*Math.random());
   const dx=aim-x0, dy=LH+24-y0, L=Math.hypot(dx,dy);
-  const sp=o.sp??LH*Math.min(2.2,novas<HARD_AT?.8+novas*.069:1.49+(novas-HARD_AT)*.08)*(pw.slow?.88:1);
-  const warn=o.warn??((novas<HARD_AT?1.25-novas*.05:.75)+(pw.radar?.6:0));
+  const sp=o.sp??LH*Math.min(1.35,.8+novas*.069)*(pw.slow?.88:1);
+  const warn=o.warn??(Math.max(.85,1.25-novas*.05)+(pw.radar?.6:0));
   const m={x:x0,y:y0,sx:x0,sy:y0,ux:dx/L,uy:dy/L,sp,warn,trail:[],r:3,near:false,done:false,entered:false,dead:false};
   meteors.push(m); sWarn(); return m;
 }
@@ -886,7 +888,13 @@ function update(dt,rdt){
   skyMix=Math.min(1,skyMix+rdt/2.5); if(skyMix>=1) skyFrom=null;
   if(!tut){ spawnT-=dt; if(spawnT<=0){ spawnT=spawn()===false?.12:(playing?Math.max(.16,P.gap-elapsed*.0018):1.4) } }
   if(playing&&!tut){
-    meteorT-=dt; if(meteorT<=0){ queueMeteor(); if(novas>=HARD_AT&&Math.random()<.3) queueMeteor(); meteorT=meteorGap() }
+    meteorT-=dt; if(meteorT<=0){
+      queueMeteor();
+      // meteor showers: doubles get more common every supernova in hard mode, triples from supernova 15
+      const extra=novas>=HARD_AT?Math.min(.65,.3+(novas-HARD_AT)*.04):0;
+      if(Math.random()<extra) queueMeteor({x0:LW*(.1+Math.random()*.8)});
+      if(novas>=HARD_AT+5&&Math.random()<extra*.5) queueMeteor({x0:LW*(.1+Math.random()*.8),aim:LW*Math.random()});
+      meteorT=meteorGap() }
     if(novas>=10){ holeT-=dt; if(holeT<=0){ spawnHole(); holeT=holeGap() } }
   }
   if(playing&&tut) tutUpdate(rdt);
