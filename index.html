@@ -5,9 +5,19 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="Supernova: a pixel-art space game. Grow from stardust to a star.">
 <meta name="theme-color" content="#0b0a1c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/favicon-64.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Supernova">
 <title>Supernova</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;600&display=swap">
+<style>
+@font-face{font-family:"Pixelify Sans";font-weight:400;font-display:swap;src:url(fonts/pixelify-sans-400.woff2) format("woff2")}
+@font-face{font-family:"Pixelify Sans";font-weight:600;font-display:swap;src:url(fonts/pixelify-sans-600.woff2) format("woff2")}
+@font-face{font-family:"Press Start 2P";font-weight:400;font-display:swap;src:url(fonts/press-start-2p-400.woff2) format("woff2")}
+</style>
 <style>
 /* Layout: pixel-art canvas drawn at CSS resolution (crisp sprites, smooth sub-pixel motion), HUD pinned top, one navy-and-gold card per screen.
    Palette from Abi's moodboard: Jet Black, Neon Navy, Blue Depths, Gentian Violet, Endless Sky, Silver Plate, Glamour Gold. Single dark theme. */
@@ -155,9 +165,15 @@ h2{font-family:var(--title);font-weight:400;font-size:14px;line-height:1.4;margi
 .row .sub{font-size:11px}
 .bestline{font-size:13px;color:var(--sky)}
 .bestline b{color:#fff;font-weight:600}
+.gapline{font-size:15px;color:var(--sky);margin-top:-6px}
+.gapline b{color:#fff;font-weight:600}
+.gapline.close{color:var(--gold-hi)}
+.gapline.close em{display:block;font-style:normal;font-family:var(--title);font-size:10px;color:var(--gold-hi);margin-bottom:6px;animation:twinkle 1.2s ease-in-out infinite}
+.steps{margin:0;padding-left:22px;text-align:left;display:flex;flex-direction:column;gap:10px;font-size:15px;line-height:1.35;color:var(--silver)}
+.steps b{color:#fff;font-weight:600}
 .overp{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
 .overp canvas{width:22px;height:22px;background:rgba(11,10,28,.6);box-shadow:0 0 0 1px var(--depths)}
-.tapnote{font-size:12px;color:var(--sky);margin-top:-6px}
+.tapnote{font-size:13px;color:var(--sky);margin-top:-6px}
 
 @media (max-height:700px){.card{gap:12px;padding-block:18px 16px}.rules{gap:8px;font-size:13.5px}.pcard{padding:9px}}
 @media (prefers-reduced-motion:reduce){.card,.card::before,.card::after,.new,.pcard,.pcard canvas{animation:none}.bump{animation:none}}
@@ -185,6 +201,7 @@ h2{font-family:var(--title);font-weight:400;font-size:14px;line-height:1.4;margi
     <div class="bestbox"><span class="sub">Best score</span><b id="menuBest">0</b></div>
     <button class="play" id="playBtn">PLAY</button>
     <div class="links"><button class="link" id="howBtn">How to play</button><button class="link" id="setBtn">Settings</button></div>
+    <button class="ghost" id="installBtn" hidden>INSTALL APP</button>
   </div>
 
   <div class="card" id="how" hidden>
@@ -198,6 +215,12 @@ h2{font-family:var(--title);font-weight:400;font-size:14px;line-height:1.4;margi
       <li><span class="ico s"></span><span>Merge two stars for a <b class="gold">supernova</b>. Every 5 supernovas you pick a power</span></li>
     </ul>
     <div class="btns"><button class="play" id="tutBtn">PLAY TUTORIAL</button><button class="ghost" id="howBack">BACK</button></div>
+  </div>
+
+  <div class="card" id="install" hidden>
+    <h2>INSTALL</h2>
+    <ol class="steps" id="installSteps"></ol>
+    <button class="ghost" id="installBack">BACK</button>
   </div>
 
   <div class="card" id="settings" hidden>
@@ -223,6 +246,7 @@ h2{font-family:var(--title);font-weight:400;font-size:14px;line-height:1.4;margi
     <div class="big" id="final">0</div>
     <div class="new" id="newBest" hidden>✦ NEW BEST ✦</div>
     <div class="bestline" id="bestLine">Best <b id="best2">0</b></div>
+    <div class="gapline" id="gapLine" hidden></div>
     <div class="row">
       <div><span class="sub">Novas</span><b id="novasOut">0</b></div>
       <div><span class="sub">Peak</span><b id="peak">DUST</b></div>
@@ -231,7 +255,7 @@ h2{font-family:var(--title);font-weight:400;font-size:14px;line-height:1.4;margi
     </div>
     <div class="overp" id="overPowers"></div>
     <div class="btns"><button class="play" id="retryBtn">RETRY</button><button class="ghost" id="menuBtn">MENU</button></div>
-    <div class="tapnote">or tap anywhere outside</div>
+    <div class="tapnote">or tap anywhere to retry</div>
   </div>
 </div>
 
@@ -600,7 +624,7 @@ function drawFace(x,y,R,alpha){
 }
 
 // ---------- screens ----------
-const CARDS=['menu','how','settings','pause','pick','over'];
+const CARDS=['menu','how','install','settings','pause','pick','over'];
 function showView(v){
   view=v;
   CARDS.forEach(c=>$(c).hidden=c!==v);
@@ -663,7 +687,11 @@ function die(cause,kind){
   waves.push({x:player.x,y:player.y,r:rad(player.t),grow:LW*.6,life:0,max:.8,col:red?'#ff6b85':hole?'#7f68ad':'#cfccc6'});
   edgeGlow=1; edgeCol=red?'rgba(255,107,133,1)':hole?'rgba(127,104,173,1)':'rgba(143,163,196,1)';
   shake=7; sDie(); buzz([40,60,90]);
-  const s=Math.floor(score), nb=s>save.best; if(nb){save.best=s; persist()}
+  const s=Math.floor(score), prevBest=save.best, nb=s>save.best; if(nb){save.best=s; persist()}
+  const gl=$('gapLine'), gap=prevBest-s;
+  gl.hidden=nb||prevBest<=0;
+  if(!gl.hidden){ const close=gap<=Math.max(50,prevBest*.1); gl.className='gapline'+(close?' close':'');
+    gl.innerHTML=(close?'<em>SO CLOSE!</em>Only ':'')+'<b>'+gap.toLocaleString()+'</b> away from your best' }
   $('cause').textContent=cause||'Collapsed at';
   $('best').textContent=save.best.toLocaleString(); $('best2').textContent=save.best.toLocaleString();
   $('peak').textContent=TIERS[peak].name; $('time').textContent=Math.floor(elapsed)+'s'; $('novasOut').textContent=novas; $('closeOut').textContent=closeCount;
@@ -671,7 +699,7 @@ function die(cause,kind){
   renderPowers($('overPowers'));
   $('final').textContent='0';
   tut=null;
-  setTimeout(()=>{ if(state!=='over') return; showView('over'); countUp($('final'),s,900) },1000);
+  setTimeout(()=>{ if(state!=='over') return; showView('over'); countUp($('final'),s,600) },650);
   player=null;
 }
 function countUp(el,to,ms){
@@ -1228,11 +1256,11 @@ function frame(now){
 let drag=null;
 function tapAnywhere(){
   if(view==='menu') start();
-  else if(view==='over' && performance.now()-overAt>1300) start();
+  else if(state==='over' && performance.now()-overAt>450) start(); // instant retry: any new tap after death
 }
 window.addEventListener('pointerdown',e=>{
   initAudio(); if(AC&&AC.state==='suspended') AC.resume();
-  if(e.target.closest&&(e.target.closest('.card')||e.target.closest('button'))) return;
+  if(e.target.closest&&(e.target.closest('button')||(e.target.closest('.card')&&view!=='over'))) return;
   if(state!=='play'&&state!=='paused'&&state!=='pick') tapAnywhere();
   drag={id:e.pointerId,x:e.clientX,y:e.clientY};
 },{passive:true});
@@ -1255,6 +1283,29 @@ $('pauseBtn').addEventListener('click',pauseGame);
 $('resumeBtn').addEventListener('click',resumeGame);
 $('quitBtn').addEventListener('click',quitRun);
 $('skipTut').addEventListener('click',()=>{ if(tut) endTutorial() });
+
+// ---------- install as an app ----------
+let installEvt=null;
+const ua=navigator.userAgent;
+const isStandalone=()=>{try{return matchMedia('(display-mode: standalone)').matches||matchMedia('(display-mode: fullscreen)').matches||navigator.standalone===true}catch(e){return false}};
+const isIOS=/iphone|ipad|ipod/i.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const inSocialApp=/Instagram|FBAN|FBAV|TikTok|Snapchat/i.test(ua);
+let topLevel=true; try{topLevel=window.top===window}catch(e){topLevel=false}
+function refreshInstall(){ $('installBtn').hidden=isStandalone()||!topLevel||!(installEvt||isIOS||inSocialApp) }
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); installEvt=e; refreshInstall() });
+window.addEventListener('appinstalled',()=>{ installEvt=null; refreshInstall(); toast('Installed!','FIND IT ON YOUR HOME SCREEN') });
+$('installBtn').addEventListener('click',async()=>{
+  if(installEvt&&!inSocialApp){ installEvt.prompt(); try{await installEvt.userChoice}catch(e){} installEvt=null; refreshInstall(); return }
+  const steps=[];
+  if(inSocialApp) steps.push('Tap the <b>•••</b> menu and choose <b>Open in browser</b>'+(isIOS?' (Safari)':''));
+  if(isIOS) steps.push('Tap the <b>Share</b> button at the bottom of Safari','Scroll down and tap <b>Add to Home Screen</b>');
+  else steps.push('Open your browser menu <b>⋮</b>','Tap <b>Install app</b> or <b>Add to Home screen</b>');
+  steps.push('Open <b>Supernova</b> from your home screen and play fullscreen');
+  $('installSteps').innerHTML=steps.map(s=>'<li>'+s+'</li>').join('');
+  showView('install');
+});
+$('installBack').addEventListener('click',()=>showView('menu'));
+refreshInstall();
 const keys={};
 window.addEventListener('keydown',e=>{keys[e.key]=true;
   if(e.key==='Escape'||e.key==='p'){ if(state==='play') pauseGame(); else if(view==='pause') resumeGame(); return }
@@ -1273,5 +1324,6 @@ for(let i=0;i<120;i++) update(1/60,1/60);
 requestAnimationFrame(frame);
 })();
 </script>
+<script>if('serviceWorker' in navigator) addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
 </body>
 </html>
