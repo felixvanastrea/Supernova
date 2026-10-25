@@ -114,8 +114,20 @@ h2{font-family:var(--title);font-weight:400;font-size:14px;line-height:1.4;margi
 
 .pcards{width:100%;display:flex;flex-direction:column;gap:10px}
 .pcard{display:grid;grid-template-columns:46px 1fr;gap:12px;align-items:center;width:100%;text-align:left;background:rgba(38,48,86,.6);border:2px solid var(--sky);padding:12px;
-  box-shadow:0 3px 0 var(--jet);animation:cardIn .4s cubic-bezier(.2,1.3,.4,1) backwards;transition:transform .1s,border-color .1s}
-.pcard:nth-child(2){animation-delay:.08s}.pcard:nth-child(3){animation-delay:.16s}
+  box-shadow:0 3px 0 var(--jet);--d:0s;transform-origin:50% 60%;will-change:transform,opacity;
+  animation:pcardIn .95s cubic-bezier(.22,.9,.3,1) var(--d) backwards;transition:transform .12s,border-color .12s}
+@keyframes pcardIn{
+  0%{opacity:0;transform:translateY(48px) scale(.82)}
+  42%{opacity:1;transform:translateY(-6px) scale(1.04)}
+  56%{transform:translateY(0) scale(.99) rotate(-2.4deg)}
+  68%{transform:scale(1.01) rotate(1.8deg)}
+  79%{transform:rotate(-1deg)}
+  90%{transform:rotate(.45deg)}
+  100%{transform:none}
+}
+.pcard canvas{animation:icoPop .55s cubic-bezier(.2,1.7,.4,1) calc(var(--d) + .38s) backwards}
+@keyframes icoPop{0%{transform:scale(.4)}100%{transform:scale(1)}}
+.pcard:nth-child(2){--d:.14s}.pcard:nth-child(3){--d:.28s}
 .pcard:active{transform:scale(.97);border-color:var(--gold)}
 .pcard canvas{width:46px;height:46px;background:rgba(11,10,28,.6)}
 .pcard div{display:flex;flex-direction:column;gap:6px;min-width:0}
@@ -148,7 +160,7 @@ h2{font-family:var(--title);font-weight:400;font-size:14px;line-height:1.4;margi
 .tapnote{font-size:12px;color:var(--sky);margin-top:-6px}
 
 @media (max-height:700px){.card{gap:12px;padding-block:18px 16px}.rules{gap:8px;font-size:13.5px}.pcard{padding:9px}}
-@media (prefers-reduced-motion:reduce){.card,.card::before,.card::after,.new,.pcard{animation:none}.bump{animation:none}}
+@media (prefers-reduced-motion:reduce){.card,.card::before,.card::after,.new,.pcard,.pcard canvas{animation:none}.bump{animation:none}}
 </style>
 </head>
 <body>
@@ -297,7 +309,9 @@ const outBack=x=>{const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.p
 const outCubic=x=>1-Math.pow(1-x,3);
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
-let sn=v=>v;
+let sn=v=>v, TS=1;
+const MAX_BODIES=10; // most planets allowed on screen at once
+const TYPE_CAP=[3,3,3,3,3,3,2]; // most of each type at once: dust, pebble, rock, moon, planet, giant, star
 
 // ---------- save: best score, tutorial flag, settings ----------
 let save={best:0,tutorialDone:false,settings:{sound:true,music:true,vibe:true,shake:true}};
@@ -416,7 +430,8 @@ function ringPts(R){
 
 function resize(){
   W=window.innerWidth; H=window.innerHeight;
-  PX=Math.max(2,Math.round(Math.min(W/140,H/250)));
+  PX=Math.max(2,Math.round(Math.min(W/200,H/360)));
+  TS=Math.max(1,2.6/PX);
   LW=Math.ceil(W/PX); LH=Math.ceil(H/PX);
   cv.width=LW*PX; cv.height=LH*PX; cv.style.width=cv.width+'px'; cv.style.height=cv.height+'px';
   sn=v=>Math.round(v*PX)/PX;
@@ -505,17 +520,18 @@ $('best').textContent=save.best.toLocaleString();
 const dotsEl=$('dots');
 TIERS.forEach(T=>{const i=document.createElement('i'); i.style.setProperty('--c',T.p[2]); dotsEl.appendChild(i)});
 
-// difficulty per supernova round: gentle, then quicker, then hard for good
+// difficulty climbs gently for 10 supernovas, then hard mode keeps ramping for good
+const HARD_AT=10;
+const EASY={spd:.85,threat:.22,same:.42,gap:.72,drift:1,jump:.15}, HARD={spd:1.95,threat:.47,same:.3,gap:.34,drift:1.6,jump:.35};
 function phase(){
-  if(state!=='play'||novas===0) return {spd:.85, threat:.22, same:.42, gap:.72, drift:1,   jump:.15};
-  if(novas===1)                  return {spd:1.1, threat:.3,  same:.37, gap:.6,  drift:1.2, jump:.2};
-  const h=novas-2;
-  return {spd:1.5+h*.15, threat:Math.min(.5,.38+h*.03), same:.3, gap:Math.max(.22,.46-h*.04), drift:1.6, jump:.35};
+  if(state!=='play') return EASY;
+  if(novas<HARD_AT){ const k=novas/HARD_AT, o={}; for(const key in EASY) o[key]=EASY[key]+(HARD[key]-EASY[key])*k; return o }
+  const h=novas-HARD_AT;
+  return {spd:HARD.spd+h*.15, threat:Math.min(.52,HARD.threat+h*.02), same:.3, gap:Math.max(.22,HARD.gap-h*.03), drift:1.6, jump:.35};
 }
 function meteorGap(){
-  if(novas===0) return 9+Math.random()*6;
-  if(novas===1) return 6+Math.random()*4;
-  return Math.max(1.6,4.5-(novas-2)*.5)+Math.random()*2.5;
+  if(novas<HARD_AT){ const k=novas/HARD_AT; return 9-6*k+Math.random()*(6-3.5*k) }
+  return Math.max(1.6,3-(novas-HARD_AT)*.3)+Math.random()*2.5;
 }
 const holeGap=()=>28+Math.random()*22;
 const scoreMult=()=>1+novas*.5;
@@ -627,7 +643,7 @@ function renderPowers(box){ box.innerHTML=''; for(const p of POWERS) if(pw[p.id]
 function start(forceTut){
   initAudio(); if(AC&&AC.state==='suspended') AC.resume();
   state='play'; elapsed=0; score=0; shownScore=0; lastShown=-1; spawnT=0; combo=0; lastMerge=-9; novas=testNovas; flash=.35; youT=3; bestToast=false;
-  peak=0; closeCount=0; closeChain=0; lastClose=-9; meteorT=14; holeT=14+Math.random()*8; slowAmt=0; slowHold=0; edgeGlow=0; pickPending=false;
+  peak=0; closeCount=0; closeChain=0; lastClose=-9; meteorT=18; holeT=14+Math.random()*8; slowAmt=0; slowHold=0; edgeGlow=0; pickPending=false;
   pw={}; bodies=[]; parts=[]; texts=[]; ghosts=[]; waves=[]; meteors=[]; holes=[]; $('toasts').innerHTML='';
   setTheme(themeFor(novas),false);
   player=newPlayer(); face=newFace(); tut=null;
@@ -682,7 +698,7 @@ function updateTierUI(){
   const n=$('tierName'); n.textContent=TIERS[player.t].name; n.style.color=TIERS[player.t].p[2]; bump(n);
   [...dotsEl.children].forEach((d,i)=>{d.className=(i<=player.t?'on':'')+(i===player.t?' cur':'')});
 }
-function updateWarp(){ const w=$('warp'); w.textContent='WARP '+(novas+1)+(novas>=2?' · HARD':''); w.className='warp'+(novas>=2?' hard':'') }
+function updateWarp(){ const w=$('warp'); w.textContent='WARP '+(novas+1)+(novas>=HARD_AT?' · HARD':''); w.className='warp'+(novas>=HARD_AT?' hard':'') }
 function setTier(t){ const old=player.t; player.t=t; player.from=rad(old)/rad(t); player.grow=0; peak=Math.max(peak,t); clampTarget(); updateTierUI() }
 
 // ---------- powers ----------
@@ -707,6 +723,7 @@ function choosePower(p){
   showView('play'); state='play'; last=performance.now();
   if(player){ player.inv=Math.max(player.inv,1.5); setMood('happy',1) }
   slowmo(.15,.5); toast(p.name,'POWER ON'); sPick(); startMusic();
+  if(novas===HARD_AT) setTimeout(()=>{ if(state==='play') toast('Hard mode','NO GOING BACK',true) },700);
 }
 
 // ---------- tutorial (first run) ----------
@@ -727,7 +744,7 @@ function tutOops(msg){
 }
 function endTutorial(){
   save.tutorialDone=true; persist(); tut=null; $('coach').hidden=true;
-  score=0; shownScore=0; lastShown=-1; elapsed=0; spawnT=.4; meteorT=14; $('score').textContent='0';
+  score=0; shownScore=0; lastShown=-1; elapsed=0; spawnT=.4; meteorT=18; $('score').textContent='0';
   toast("Let's go!",'GOOD LUCK'); slowmo(.1,.4);
 }
 function tutUpdate(rdt){
@@ -758,6 +775,7 @@ function tutUpdate(rdt){
 
 // ---------- spawning ----------
 function spawn(){
+  if(bodies.reduce((n,b)=>n+(b.dead?0:1),0)>=MAX_BODIES) return false;
   const P=phase();
   const pt=state==='play'&&player?player.t:2+Math.floor(Math.random()*3);
   let r=Math.random(), t;
@@ -767,6 +785,9 @@ function spawn(){
   else t=pt+1+(Math.random()<P.jump?1:0);
   if(t<0) t=Math.random()<.5?0:pt;
   t=Math.min(MAXT,t);
+  // per-type cap: if this type is full, use the nearest smaller type with room, otherwise skip
+  const cnt=TIERS.map(()=>0); for(const b of bodies) if(!b.dead) cnt[b.t]++;
+  if(cnt[t]>=TYPE_CAP[t]){ let alt=-1; for(let k=t-1;k>=0;k--) if(cnt[k]<TYPE_CAP[k]){alt=k;break} if(alt<0) return false; t=alt }
   const R=rad(t);
   for(let k=0;k<6;k++){
     const x=R+1+Math.random()*(LW-2*R-2), y=-R-4;
@@ -782,8 +803,8 @@ function queueMeteor(o={}){
   const x0=o.x0??LW*(.1+Math.random()*.8), y0=-6;
   const aim=o.aim??(player&&Math.random()<.55 ? player.x+(Math.random()-.5)*LW*.3 : LW*Math.random());
   const dx=aim-x0, dy=LH+24-y0, L=Math.hypot(dx,dy);
-  const sp=o.sp??LH*Math.min(2.2,novas>=2?1.25+(novas-2)*.08:1)*(pw.slow?.88:1);
-  const warn=o.warn??((novas>=2?.75:1)+(pw.radar?.6:0));
+  const sp=o.sp??LH*Math.min(2.2,novas<HARD_AT?.8+novas*.069:1.49+(novas-HARD_AT)*.08)*(pw.slow?.88:1);
+  const warn=o.warn??((novas<HARD_AT?1.25-novas*.05:.75)+(pw.radar?.6:0));
   const m={x:x0,y:y0,sx:x0,sy:y0,ux:dx/L,uy:dy/L,sp,warn,trail:[],r:3,near:false,done:false,entered:false,dead:false};
   meteors.push(m); sWarn(); return m;
 }
@@ -832,9 +853,9 @@ function update(dt,rdt){
   const v=scrollSpeed();
   scrollY+=v*dt;
   skyMix=Math.min(1,skyMix+rdt/2.5); if(skyMix>=1) skyFrom=null;
-  if(!tut){ spawnT-=dt; if(spawnT<=0){spawn(); spawnT=playing?Math.max(.16,P.gap-elapsed*.0018):1.4} }
+  if(!tut){ spawnT-=dt; if(spawnT<=0){ spawnT=spawn()===false?.12:(playing?Math.max(.16,P.gap-elapsed*.0018):1.4) } }
   if(playing&&!tut){
-    meteorT-=dt; if(meteorT<=0){ queueMeteor(); if(novas>=3&&Math.random()<.3) queueMeteor(); meteorT=meteorGap() }
+    meteorT-=dt; if(meteorT<=0){ queueMeteor(); if(novas>=HARD_AT&&Math.random()<.3) queueMeteor(); meteorT=meteorGap() }
     if(novas>=10){ holeT-=dt; if(holeT<=0){ spawnHole(); holeT=holeGap() } }
   }
   if(playing&&tut) tutUpdate(rdt);
@@ -866,12 +887,7 @@ function update(dt,rdt){
     for(let j=i+1;j<bodies.length;j++){const b=bodies[j]; if(b.dead) continue;
       const dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||.01, min=a.r+b.r+1;
       if(d<min){
-        if(a.t===b.t && a.t<MAXT && a.y>0 && b.y>0 && !a.tut && !b.tut){
-          const t=a.t+1; a.dead=b.dead=true;
-          const nb={x:(a.x+b.x)/2,y:(a.y+b.y)/2,vx:(a.vx+b.vx)/2,vy:(a.vy+b.vy)/2,t,r:rad(t),pop:.32,ph:a.ph,spin:a.spin};
-          bodies.push(nb); burst(nb.x,nb.y,TIERS[t].p,10,35);
-          waves.push({x:nb.x,y:nb.y,r:nb.r,grow:7,life:0,max:.3,col:TIERS[t].p[3]});
-        } else {
+        { // planets only bounce off each other; only the player merges
           const nx=dx/d, ny=dy/d, push=(min-d)/2;
           a.x-=nx*push; a.y-=ny*push; b.x+=nx*push; b.y+=ny*push;
           const rel=(b.vx-a.vx)*nx+(b.vy-a.vy)*ny;
@@ -984,7 +1000,8 @@ function update(dt,rdt){
 function supernova(mult){
   novas++;
   const gain=addScore(4000*mult*novas);
-  for(const b of bodies){ if(!b.dead && b.y>-b.r){ b.dead=true; burst(b.x,b.y,TIERS[b.t].p,8,70) } }
+  for(const b of bodies){ if(!b.dead){ b.dead=true; if(b.y>-b.r) burst(b.x,b.y,TIERS[b.t].p,8,70) } }
+  spawnT=.5;
   for(const m of meteors){ if(m.entered) burst(m.x,m.y,['#ff6b85','#f3dfa8'],10,60) }
   for(const h of holes) burst(h.x,h.y,['#7f68ad','#f3dfa8','#ffffff'],30,90);
   meteors=[]; holes=[];
@@ -1001,7 +1018,7 @@ function supernova(mult){
   const ti=themeFor(novas);
   if(ti!==themeIdx){ setTheme(ti,true); setTimeout(()=>{ if(state==='play') toast('New world',THEMES[ti].name) },700) }
   if(novas%5===0 && POWERS.some(p=>!pw[p.id])){ pickPending=true; pickDelay=1.1 }
-  else if(novas===2) setTimeout(()=>{ if(state==='play') toast('Hard mode','NO GOING BACK',true) },900);
+  else if(novas===HARD_AT) setTimeout(()=>{ if(state==='play') toast('Hard mode','NO GOING BACK',true) },900);
   else if(ti===themeIdx) setTimeout(()=>{ if(state==='play') toast('Shield restored','WARP '+(novas+1)) },900);
 }
 
@@ -1161,7 +1178,7 @@ function draw(now){
     }
     const ay=y+R+6+Math.sin(now*.008)*1;
     ctx.fillStyle='#d9b872'; px(x-2,ay+2,5,1); px(x-1,ay+1,3,1); px(x,ay);
-    if(youT>0){ ctx.globalAlpha=Math.min(1,youT); ctx.font='600 8px "Pixelify Sans", monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    if(youT>0){ ctx.globalAlpha=Math.min(1,youT); ctx.font=`600 ${(8*TS).toFixed(2)}px "Pixelify Sans", monospace`; ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillStyle='#0b0a1c'; ctx.fillText('YOU',x+.6,ay+10.6); ctx.fillStyle='#f3dfa8'; ctx.fillText('YOU',x,ay+10); ctx.globalAlpha=1 }
     if(tut&&tut.step===0&&!tut.wait){ const o=Math.round(R+8+Math.sin(now*.01)*2); ctx.fillStyle='#f3dfa8';
       for(let i=0;i<3;i++){ px(x-o-i,y-i,1,2*i+1); px(x+o+i,y-i,1,2*i+1) } }
@@ -1174,7 +1191,7 @@ function draw(now){
     const k=t.life/t.max, s=outBack(Math.min(1,t.life/.22)), a=k>.7?(1-k)/.3:1;
     if(s<=.05) continue;
     ctx.globalAlpha=Math.max(0,a);
-    ctx.font=`${t.weight} ${(t.size*s).toFixed(2)}px "Pixelify Sans", monospace`;
+    ctx.font=`${t.weight} ${(t.size*s*TS).toFixed(2)}px "Pixelify Sans", monospace`;
     ctx.fillStyle='#0b0a1c'; ctx.fillText(t.txt,t.x+.6,t.y+.6);
     ctx.fillStyle=t.col; ctx.fillText(t.txt,t.x,t.y);
   }
